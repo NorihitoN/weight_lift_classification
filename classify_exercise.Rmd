@@ -1,0 +1,144 @@
+---
+title: "Multi-class Classification Exercise"
+author: "Norihito Nakata"
+date: "10/29/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Getting and Cleaning data
+
+The goal of your project is to predict the manner in which they did the exercise. I use devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively.
+
+```{r}
+rm(list=ls())
+# Download csv file from web page
+if (!file.exists("./training.csv")) {
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+                  destfile = "./training.csv")
+}
+if (!file.exists("./testing.csv")) {
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+                  destfile = "./testing.csv")
+}
+training <- read.csv("training.csv")
+testing <- read.csv("testing.csv")
+dim(training); dim(testing)
+```
+
+The dataset has 160 columns, but some columns NAs. First, I exclude the columns which has more NAs than 95% in that column, and the number of columns is reduced from 160 to 93. Next, I exclude the columns which has near zero variance because this kind of feature has the distorted frequency in this column. By excluding near zero variance, the number of columns is reduced to 59. And then, I removed column 1 to 5, which are not features.
+
+```{r}
+str(training)
+```
+
+```{r}
+# Exclude the columns
+trainingSet <- training[, which(sapply(training, function(x){mean(is.na(x)) < 0.95}))]
+testingSet <- testing[, which(sapply(training, function(x){mean(is.na(x)) < 0.95}))]
+dim(trainingSet); dim(testingSet)
+```
+
+```{r}
+# Exclude near Zero Variance columns
+library(caret)
+nzv <- nearZeroVar(trainingSet)
+trainingSet <- trainingSet[, -nzv]
+testingSet <- testingSet[, -nzv]
+dim(trainingSet); dim(testingSet)
+```
+
+```{r}
+# Exclude first 5 columns which is default.
+trainingSet <- trainingSet[, -(1:5)]
+testingSet <- testingSet[, -(1:5)]
+dim(trainingSet); dim(testingSet)
+```
+
+I separate training data to `trainSet` and `testSet`. `trainSet` is to build models, and `testSet` is to select the best model among the learned models.
+
+```{r}
+set.seed(1234)
+trainIndex <- createDataPartition(trainingSet$classe, p=0.75, list = FALSE)
+trainSet <- trainingSet[trainIndex,]
+testSet <- trainingSet[-trainIndex,]
+```
+
+## Exploratory Data Analysis
+
+The extracted columns has 53 features and `classe` is the outcome. I plot correlation of 53 features to see the relation between features. Highly correlated features are dark colors.
+
+```{r}
+library(corrplot)
+corrMatrix <- cor(trainSet[, -54])
+corrplot(corrMatrix, method="circle", type="lower", order="hclust", tl.cex = 0.5, tl.col="black")
+```
+
+
+## Create Prediction Model
+
+This problem is multi-class classification so I use tree-base methods, *decision tree*, *random forest* and *gradient boost*.
+
+### Decision tree
+
+```{r}
+library(rpart)
+library(rattle)
+set.seed(1234)
+mdlFit_DT <- rpart(classe ~ ., data=trainSet, method="class")
+fancyRpartPlot(mdlFit_DT)
+```
+
+```{r}
+predict_DT <- predict(mdlFit_DT, newdata = testSet, type="class")
+confusionMatrix(predict_DT, testSet$classe)
+```
+
+
+### Random forest
+
+```{r}
+set.seed(1234)
+mdlFit_RF <- train(classe ~ ., data = trainSet, method="rf")
+mdlFit_RF
+```
+
+```{r}
+predict_RF <- predict(mdlFit_RF, newdata = testSet)
+confusionMatrix(predict_RF, testSet$classe)
+```
+
+
+### Gradient Boost
+
+```{r}
+set.seed(1234)
+mdlFit_GBM <- train(classe ~ ., data = trainSet, method="gbm")
+mdlFit_GBM
+```
+
+```{r}
+predict_GBM <- predict(mdlFit_GBM, newdata = testSet)
+confusionMatrix(predict_GBM, testSet$classe)
+```
+
+
+```{r}
+confusionMatrix(predict_DT, testSet$classe)$overall['Accuracy']
+confusionMatrix(predict_RF, testSet$classe)$overall['Accuracy']
+confusionMatrix(predict_GBM, testSet$classe)$overall['Accuracy']
+```
+
+Random forest is the highest accuracy for `testSet`, so I use `mdlFit_RF` to predict `testingSet`.
+
+## Prediction for test data.
+
+```{r}
+predict.Test <- predict(mdlFit_RF, newdata = testingSet)
+predict.Test
+```
+
+
