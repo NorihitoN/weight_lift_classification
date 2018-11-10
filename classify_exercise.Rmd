@@ -80,7 +80,7 @@ corrplot(corrMatrix, method="circle", type="lower", order="hclust", tl.cex = 0.5
 
 ## Create Prediction Model
 
-This problem is multi-class classification so I use tree-base methods, *decision tree*, *random forest* and *gradient boost*.
+This problem is multi-class classification so I use tree-base methods, *decision tree*, *random forest* and *gradient boost* to choose a better model.
 
 ### Decision tree
 
@@ -90,10 +90,17 @@ library(rattle)
 set.seed(1234)
 mdlFit_DT <- rpart(classe ~ ., data=trainSet, method="class")
 fancyRpartPlot(mdlFit_DT)
+printcp(mdlFit_DT)
+
+tc <- trainControl("cv",4)
+rpart.grid <- expand.grid(.cp=0.001)
+mdlFit_DT <- train(classe ~ ., data=trainSet, method="rpart", trControl=tc, tuneGrid=rpart.grid) 
+fancyRpartPlot(mdlFit_DT$finalModel)
+mdlFit_DT
 ```
 
 ```{r}
-predict_DT <- predict(mdlFit_DT, newdata = testSet, type="class")
+predict_DT <- predict(mdlFit_DT, newdata = testSet)
 confusionMatrix(predict_DT, testSet$classe)
 ```
 
@@ -102,7 +109,7 @@ confusionMatrix(predict_DT, testSet$classe)
 
 ```{r}
 set.seed(1234)
-mdlFit_RF <- train(classe ~ ., data = trainSet, method="rf")
+mdlFit_RF <- train(classe ~ ., data = trainSet, method="rf", trControl=tc)
 mdlFit_RF
 ```
 
@@ -116,7 +123,7 @@ confusionMatrix(predict_RF, testSet$classe)
 
 ```{r}
 set.seed(1234)
-mdlFit_GBM <- train(classe ~ ., data = trainSet, method="gbm")
+mdlFit_GBM <- train(classe ~ ., data = trainSet, method="gbm", trControl=tc)
 mdlFit_GBM
 ```
 
